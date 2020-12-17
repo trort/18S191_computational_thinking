@@ -32,7 +32,7 @@ Feel free to ask questions!
 # ╔═╡ 911ccbce-ed68-11ea-3606-0384e7580d7c
 # edit the code below to set your name and kerberos ID (i.e. email without @mit.edu)
 
-student = (name = "aa", kerberos_id = "000")
+student = (name = "trort", kerberos_id = "000")
 
 # press the ▶ button in the bottom right of this cell to run your edits
 # or use Shift+Enter
@@ -681,8 +681,10 @@ md"""
 
 # ╔═╡ 7c2ec6c6-ee15-11ea-2d7d-0d9401a5e5d1
 function extend_mat(M::AbstractMatrix, i, j)
-	
-	return missing
+	num_rows, num_columns = size(M)
+	i_bounded = max(min(i, num_rows), 1)
+	j_bounded = max(min(j, num_columns), 1)
+	return M[i_bounded, j_bounded]
 end
 
 # ╔═╡ 9afc4dca-ee16-11ea-354f-1d827aaa61d2
@@ -717,8 +719,15 @@ md"""
 
 # ╔═╡ 8b96e0bc-ee15-11ea-11cd-cfecea7075a0
 function convolve_image(M::AbstractMatrix, K::AbstractMatrix)
-	
-	return missing
+	M_rows, M_columns = size(M)
+	K_rows, K_columns = size(K)
+	K = reshape(K, (K_rows, K_columns))
+	M_convolved = [sum([extend_mat(M,i-(k-K_rows÷2-1),j-(l-K_columns÷2-1)) * K[k, l]
+			for (k,l) in Iterators.product(1:K_rows,1:K_columns)]) 
+		    for (i,j) in Iterators.product(1:M_rows,1:M_columns)]
+	# M'_{i, j} = \sum_{k, l}  \, M_{i- k, j - l} \, K_{k, l}
+	#sum([extend(v, i-j) * k[j + l + 1] for j in -l:l])
+	return M_convolved
 end
 
 # ╔═╡ 5a5135c6-ee1e-11ea-05dc-eb0c683c2ce5
@@ -729,9 +738,9 @@ test_image_with_border = [get(small_image, (i, j), Gray(0)) for (i,j) in Iterato
 
 # ╔═╡ 275a99c8-ee1e-11ea-0a76-93e3618c9588
 K_test = [
-	0   0  0
-	1/2 0  1/2
-	0   0  0
+	0  1/8  0
+	1/8  1/2  1/8
+	0  1/8  0
 ]
 
 # ╔═╡ 42dfa206-ee1e-11ea-1fcd-21671042064c
@@ -764,9 +773,11 @@ $$G(x,y)=\frac{1}{2\pi \sigma^2}e^{\frac{-(x^2+y^2)}{2\sigma^2}}$$
 
 # ╔═╡ aad67fd0-ee15-11ea-00d4-274ec3cda3a3
 function with_gaussian_blur(image)
-	
-	return missing
+	return convolve_image(image, Kernel.gaussian(5))
 end
+
+# ╔═╡ 7c4d59e0-401f-11eb-179d-1d19d2666b3c
+with_gaussian_blur(philip)
 
 # ╔═╡ 8ae59674-ee18-11ea-3815-f50713d0fa08
 md"_Let's make it interactive. 💫_"
@@ -816,9 +827,14 @@ For simplicity you can choose one of the "channels" (colours) in the image to ap
 
 # ╔═╡ 9eeb876c-ee15-11ea-1794-d3ea79f47b75
 function with_sobel_edge_detect(image)
-	
-	return missing
+	Gx = convolve_image(getproperty.(image, :r), Kernel.sobel()[1])
+	Gy = convolve_image(getproperty.(image, :r), Kernel.sobel()[2])
+	G = sqrt.(Gx.*Gx + Gy.*Gy)
+	return Gray.(G)
 end
+
+# ╔═╡ 0f994550-4026-11eb-2ec9-b11ce129e623
+with_sobel_edge_detect(philip)
 
 # ╔═╡ 1b85ee76-ee10-11ea-36d7-978340ef61e6
 md"""
@@ -1551,12 +1567,14 @@ with_sobel_edge_detect(sobel_camera_image)
 # ╟─8a335044-ee19-11ea-0255-b9391246d231
 # ╠═7c50ea80-ee15-11ea-328f-6b4e4ff20b7e
 # ╠═aad67fd0-ee15-11ea-00d4-274ec3cda3a3
+# ╠═7c4d59e0-401f-11eb-179d-1d19d2666b3c
 # ╟─8ae59674-ee18-11ea-3815-f50713d0fa08
 # ╟─94c0798e-ee18-11ea-3212-1533753eabb6
 # ╠═a75701c4-ee18-11ea-2863-d3042e71a68b
 # ╟─f461f5f2-ee18-11ea-3d03-95f57f9bf09e
 # ╟─7c6642a6-ee15-11ea-0526-a1aac4286cdd
 # ╠═9eeb876c-ee15-11ea-1794-d3ea79f47b75
+# ╠═0f994550-4026-11eb-2ec9-b11ce129e623
 # ╟─1a0324de-ee19-11ea-1d4d-db37f4136ad3
 # ╠═1bf94c00-ee19-11ea-0e3c-e12bc68d8e28
 # ╟─1ff6b5cc-ee19-11ea-2ca8-7f00c204f587
