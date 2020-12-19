@@ -57,8 +57,8 @@ end
 
 # ╔═╡ 74b008f6-ed6b-11ea-291f-b3791d6d1b35
 begin
-	Pkg.add(["Images", "ImageMagick"])
-	using Images
+	Pkg.add(["Images", "ImageMagick", "OffsetArrays"])
+	using Images,OffsetArrays
 end
 
 # ╔═╡ 6b30dc38-ed6b-11ea-10f3-ab3f121bf4b8
@@ -156,11 +156,7 @@ md"""
 
 # ╔═╡ 8c19fb72-ed6c-11ea-2728-3fa9219eddc4
 function vecvec_to_matrix(vecvec)
-	mat = fill(0, length(vecvec), length(vecvec[1]))
-	for i in 1:length(vecvec)
-		mat[i,:] = vecvec[i]
-	end
-	return mat
+	return [vecvec[i][j] for i in 1:length(vecvec), j in 1:length(vecvec[1])]
 end
 
 # ╔═╡ c4761a7e-edf2-11ea-1e75-118e73dadbed
@@ -221,9 +217,9 @@ md"""
 
 # ╔═╡ f6898df6-ee07-11ea-2838-fde9bc739c11
 function mean_colors(image)
-	return (mean([x.r for x in image]),
-		mean([x.g for x in image]),
-		mean([x.b for x in image]))
+	return (mean(getproperty.(image, :r)),
+		    mean(getproperty.(image, :g)),
+		    mean(getproperty.(image, :b)))
 end
 
 # ╔═╡ f68d4a36-ee07-11ea-0832-0360530f102e
@@ -574,8 +570,17 @@ Again, we need to take care about what happens if $v_{i -n }$ falls off the end 
 # ╔═╡ 28e20950-ee0c-11ea-0e0a-b5f2e570b56e
 function convolve_vector(v, k)
 	l = (length(k)-1) ÷ 2
-	v_convolved = [sum([extend(v, i-j) * k[j + l + 1] for j in -l:l]) for i in 1:length(v)]
+	k_offset = OffsetArray(k, -l:l)
+	v_convolved = [sum([extend(v, i-j) * k_offset[j] for j in -l:l])
+		           for i in 1:length(v)]
+	# v_convolved = [sum([extend(v, i-j) * k[j + l + 1] for j in -l:l]) for i in 1:length(v)]
 	return v_convolved
+end
+
+# ╔═╡ e6b843d0-41af-11eb-36dd-1557fab2c29d
+begin
+	tmp = [0, 1, 0]
+	offset_tmp = OffsetArray(tmp, -1:1)
 end
 
 # ╔═╡ 93284f92-ee12-11ea-0342-833b1a30625c
@@ -615,7 +620,6 @@ For simplicity you can take $\sigma=1$.
 
 # ╔═╡ 1c8b4658-ee0c-11ea-2ede-9b9ed7d3125e
 function gaussian_kernel(n)
-	
 	kernel = [exp(-i*i / 2) for i in -n:n]
 	kernel = kernel ./ sum(kernel)
 	return kernel
@@ -721,12 +725,13 @@ md"""
 function convolve_image(M::AbstractMatrix, K::AbstractMatrix)
 	M_rows, M_columns = size(M)
 	K_rows, K_columns = size(K)
-	K = reshape(K, (K_rows, K_columns))
-	M_convolved = [sum([extend_mat(M,i-(k-K_rows÷2-1),j-(l-K_columns÷2-1)) * K[k, l]
-			for (k,l) in Iterators.product(1:K_rows,1:K_columns)]) 
+	K_offset_row_idx = -(K_rows÷2):(K_rows-K_rows÷2-1)
+	K_offset_column_idx = -(K_columns÷2):(K_columns-K_columns÷2-1)
+	K_offset = OffsetArray(K, K_offset_row_idx, K_offset_column_idx)
+	M_convolved = [sum([extend_mat(M,i-k,j-l) * K_offset[k, l]
+			for (k,l) in Iterators.product(K_offset_row_idx,K_offset_column_idx)]) 
 		    for (i,j) in Iterators.product(1:M_rows,1:M_columns)]
 	# M'_{i, j} = \sum_{k, l}  \, M_{i- k, j - l} \, K_{k, l}
-	#sum([extend(v, i-j) * k[j + l + 1] for j in -l:l])
 	return M_convolved
 end
 
@@ -738,9 +743,9 @@ test_image_with_border = [get(small_image, (i, j), Gray(0)) for (i,j) in Iterato
 
 # ╔═╡ 275a99c8-ee1e-11ea-0a76-93e3618c9588
 K_test = [
-	0  1/8  0
-	1/8  1/2  1/8
-	0  1/8  0
+	0  0  0
+	1/2  0  1/2
+	0  0  0
 ]
 
 # ╔═╡ 42dfa206-ee1e-11ea-1fcd-21671042064c
@@ -773,7 +778,7 @@ $$G(x,y)=\frac{1}{2\pi \sigma^2}e^{\frac{-(x^2+y^2)}{2\sigma^2}}$$
 
 # ╔═╡ aad67fd0-ee15-11ea-00d4-274ec3cda3a3
 function with_gaussian_blur(image)
-	return convolve_image(image, Kernel.gaussian(5))
+	return convolve_image(image, Kernel.gaussian(10))
 end
 
 # ╔═╡ 7c4d59e0-401f-11eb-179d-1d19d2666b3c
@@ -827,8 +832,13 @@ For simplicity you can choose one of the "channels" (colours) in the image to ap
 
 # ╔═╡ 9eeb876c-ee15-11ea-1794-d3ea79f47b75
 function with_sobel_edge_detect(image)
-	Gx = convolve_image(getproperty.(image, :r), Kernel.sobel()[1])
-	Gy = convolve_image(getproperty.(image, :r), Kernel.sobel()[2])
+	if image[1,1] isa RGB
+		image_to_detect = getproperty.(image, :r)
+	else
+		image_to_detect = image
+	end
+	Gx = convolve_image(image_to_detect, Kernel.sobel()[1])
+	Gy = convolve_image(image_to_detect, Kernel.sobel()[2])
 	G = sqrt.(Gx.*Gx + Gy.*Gy)
 	return Gray.(G)
 end
@@ -1527,6 +1537,7 @@ with_sobel_edge_detect(sobel_camera_image)
 # ╟─ea435e58-ee11-11ea-3785-01af8dd72360
 # ╟─80ab64f4-ee09-11ea-29b4-498112ed0799
 # ╠═28e20950-ee0c-11ea-0e0a-b5f2e570b56e
+# ╠═e6b843d0-41af-11eb-36dd-1557fab2c29d
 # ╟─e9aadeee-ee1d-11ea-3525-95f6ba5fda31
 # ╟─5eea882c-ee13-11ea-0d56-af81ecd30a4a
 # ╠═93284f92-ee12-11ea-0342-833b1a30625c
