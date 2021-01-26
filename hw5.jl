@@ -512,6 +512,12 @@ We create a new agent type `SocialAgent` with fields `position`, `status`, `num_
 # ╔═╡ c704ea4c-0aec-11eb-2f2c-859c954aa520
 md"""define the `position` and `color` methods for `SocialAgent` as we did for `Agent`. This will allow the `visualize` function to work. on both kinds of Agents"""
 
+# ╔═╡ e97e39aa-0a5d-11eb-3d5f-f90a0acfe5a2
+# begin
+# 	position(a::SocialAgent) = a.position
+# 	color(a::SocialAgent) = color(a.status)
+# end
+
 # ╔═╡ b554b654-0a41-11eb-0e0d-e57ff68ced33
 md"""
 👉 Create a function `initialize_social` that takes `N` and `L`, and creates N agents  within a 2L x 2L box, with `social_score`s chosen from 10 equally-spaced between 0.1 and 0.5. (see LinRange)
@@ -553,10 +559,27 @@ end
 initialize(3, 10)
 
 # ╔═╡ b5a88504-0a47-11eb-0eda-f125d419e909
-position(a::Agent) = a.position # uncomment this line
+position(a::AbstractAgent) = a.position # uncomment this line
 
 # ╔═╡ 87a4cdaa-0a5a-11eb-2a5e-cfaf30e942ca
-color(a::Agent) = color(a.status) # uncomment this line
+color(a::AbstractAgent) = color(a.status) # uncomment this line
+
+# ╔═╡ 1ccc961e-0a69-11eb-392b-915be07ef38d
+function visualize(agents::Vector, L)
+	p = plot(ratio=1)
+	scatter!(p, make_tuple.(position.(agents)), color = color.(agents),
+		label = nothing)
+	outer_box = Shape([-L,L,L,-L],[-L,-L,L,L])
+	plot!(outer_box, fillalpha = 0, label = nothing)
+	return p
+end
+
+# ╔═╡ 1f96c80a-0a46-11eb-0690-f51c60e57c3f
+let
+	N = 20
+	L = 10
+	visualize(initialize(N, L), L) # uncomment this line!
+end
 
 # ╔═╡ 4f6ac130-5e90-11eb-03e0-2dbe0ba3349b
 # functions for Agent type
@@ -598,29 +621,6 @@ mutable struct SocialAgent <: AbstractAgent
 	status::InfectionStatus
 	num_infected::Integer
 	social_score::Float64
-end
-
-# ╔═╡ e97e39aa-0a5d-11eb-3d5f-f90a0acfe5a2
-begin
-	position(a::SocialAgent) = a.position
-	color(a::SocialAgent) = color(a.status)
-end
-
-# ╔═╡ 1ccc961e-0a69-11eb-392b-915be07ef38d
-function visualize(agents::Vector, L)
-	p = plot(ratio=1)
-	scatter!(p, make_tuple.(position.(agents)), color = color.(agents),
-		label = nothing)
-	outer_box = Shape([-L,L,L,-L],[-L,-L,L,L])
-	plot!(outer_box, fillalpha = 0, label = nothing)
-	return p
-end
-
-# ╔═╡ 1f96c80a-0a46-11eb-0690-f51c60e57c3f
-let
-	N = 20
-	L = 10
-	visualize(initialize(N, L), L) # uncomment this line!
 end
 
 # ╔═╡ 40c1c1d6-0a69-11eb-3913-59e9b9ec4332
@@ -682,6 +682,124 @@ function step!(agents::Vector{<:AbstractAgent}, L::Number, infection::AbstractIn
 		end
 	end
 	return agents
+end
+
+# ╔═╡ bda32d30-5ec8-11eb-2c5c-f35e2847f035
+let
+	agent = SocialAgent(Coordinate(0,0), S, 0, 0.1)
+	source = SocialAgent(Coordinate(0,0), I, 0, 0.1)
+	
+	interact!(agent, source, pandemic)
+	
+	(agent=agent, source=source)
+end
+
+# ╔═╡ a885bf78-0a5c-11eb-2383-9d74c8765847
+md"""
+Make sure `step!`, `position`, `color`, work on the type `SocialAgent`. If `step!` takes an untyped first argument, it should work for both Agent and SocialAgent types without any changes. We actually only need to specialize `interact!` on SocialAgent.
+
+#### Exercise 4.3
+👉 Plot the SIR curves of the resulting simulation.
+
+N = 50;
+L = 40;
+number of steps = 200
+
+In each step call `step!` 50N times.
+"""
+
+# ╔═╡ b59de26c-0a41-11eb-2c67-b5f3c7780c91
+md"""
+#### Exercise 4.4
+👉 Make a scatter plot showing each agent's `social_score` on one axis, and the `num_infected` from the simulation in the other axis. Run this simulation several times and comment on the results.
+"""
+
+# ╔═╡ 6a3464d0-5ecc-11eb-2eed-6fa78e0af4e9
+md"""
+`num_infected` is slightly higher for agents with higher social score
+"""
+
+# ╔═╡ b5b4d834-0a41-11eb-1b18-1bd626d18934
+md"""
+👉 Run a simulation for 100 steps, and then apply a "lockdown" where every agent's social score gets multiplied by 0.25, and then run a second simulation which runs on that same population from there.  What do you notice?  How does changing this factor form 0.25 to other numbers affect things?
+"""
+
+# ╔═╡ 05fc5634-09a0-11eb-038e-53d63c3edaf2
+md"""
+## **Exercise 5:** (Optional) _Effect of distancing_
+
+We can use a variant of the above model to investigate the effect of the
+mis-named "social distancing"  
+(we want people to be *socially* close, but *physically* distant).
+
+In this variant, we separate out the two effects "infection" and
+"movement": an infected agent chooses a
+neighbouring site, and if it finds a susceptible there then it infects it
+with probability $p_I$. For simplicity we can ignore recovery.
+
+Separately, an agent chooses a neighbouring site to move to,
+and moves there with probability $p_M$ if the site is vacant. (Otherwise it
+stays where it is.)
+
+When $p_M = 0$, the agents cannot move, and hence are
+completely quarantined in their original locations.
+
+👉 How does the disease spread in this case?
+
+"""
+
+# ╔═╡ 24c2fb0c-0a42-11eb-1a1a-f1246f3420ff
+mutable struct SocialDistancingAgent <: AbstractAgent 
+	position::Coordinate
+	status::InfectionStatus
+end
+
+# ╔═╡ eb837850-5f7b-11eb-169f-99bf7bcbbfe3
+struct SocialDistancingInfection <: AbstractInfection
+	p_infection::Float64
+	p_move::Float64
+	p_move_infected::Float64
+end
+
+# ╔═╡ 81e174d0-5f79-11eb-3274-b7659aaecee8
+begin
+	function initialize_social_distancing(N::Number, L::Number)
+		agents = [SocialDistancingAgent(rand_Coordinate(L), S) for _ in 1:N]
+		rand(agents).status = I
+		return agents
+	end
+	
+	function step!(agents::Vector{SocialDistancingAgent}, L::Number, 
+			infection::SocialDistancingInfection)
+		source = rand(agents)
+		
+		if is_infected(source)
+			# try infect a neighbour
+			infect_dir = rand(possible_moves)
+			infect_position = collide_boundary(source.position + infect_dir, L)
+			vunerable_idx = findfirst((position.(agents) .== (infect_position,))
+			                          .& is_susceptible.(agents))
+			if !isnothing(vunerable_idx) && rand() < infection.p_infection
+				set_status!(agents[vunerable_idx], I)
+			end
+		end
+		
+		# make possible move
+		move = rand(possible_moves)
+		new_source_position = collide_boundary(source.position + move, L)
+		move_probability = if is_infected(source)
+			infection.p_move_infected
+		else
+			infection.p_move
+		end
+		if (!any(position.(agents) .== (new_source_position,))
+			&& rand() < move_probability)
+			set_position!(source, new_source_position)
+		end
+		
+		return agents
+	end
+	
 end
 
 # ╔═╡ 3dc46af2-5ebb-11eb-0113-3727c0ca46a1
@@ -805,6 +923,22 @@ let
 	p
 end
 
+# ╔═╡ faec52a8-0a60-11eb-082a-f5787b09d88c
+let
+	N = 50
+    L = 40
+	sim_steps = 10000
+	
+	sim_social_agents = initialize_social(N, L)
+	for _ in 1:sim_steps
+		sweep!(sim_social_agents, L, pandemic)
+	end
+	
+	scatter(getproperty.(sim_social_agents, :social_score),
+	    getproperty.(sim_social_agents, :num_infected), 
+	    alpha = 0.3, label=nothing)
+end
+
 # ╔═╡ e5040c9e-0a65-11eb-0f45-270ab8161871
 let
     N = 50
@@ -840,30 +974,6 @@ let
     end
 end
 
-# ╔═╡ bda32d30-5ec8-11eb-2c5c-f35e2847f035
-let
-	agent = SocialAgent(Coordinate(0,0), S, 0, 0.1)
-	source = SocialAgent(Coordinate(0,0), I, 0, 0.1)
-	
-	interact!(agent, source, pandemic)
-	
-	(agent=agent, source=source)
-end
-
-# ╔═╡ a885bf78-0a5c-11eb-2383-9d74c8765847
-md"""
-Make sure `step!`, `position`, `color`, work on the type `SocialAgent`. If `step!` takes an untyped first argument, it should work for both Agent and SocialAgent types without any changes. We actually only need to specialize `interact!` on SocialAgent.
-
-#### Exercise 4.3
-👉 Plot the SIR curves of the resulting simulation.
-
-N = 50;
-L = 40;
-number of steps = 200
-
-In each step call `step!` 50N times.
-"""
-
 # ╔═╡ 1f172700-0a42-11eb-353b-87c0039788bd
 let
     N = 50
@@ -897,38 +1007,6 @@ let
         plot(left, right)
     end
 end
-
-# ╔═╡ b59de26c-0a41-11eb-2c67-b5f3c7780c91
-md"""
-#### Exercise 4.4
-👉 Make a scatter plot showing each agent's `social_score` on one axis, and the `num_infected` from the simulation in the other axis. Run this simulation several times and comment on the results.
-"""
-
-# ╔═╡ faec52a8-0a60-11eb-082a-f5787b09d88c
-let
-	N = 50
-    L = 40
-	sim_steps = 10000
-	
-	sim_social_agents = initialize_social(N, L)
-	for _ in 1:sim_steps
-		sweep!(sim_social_agents, L, pandemic)
-	end
-	
-	scatter(getproperty.(sim_social_agents, :social_score),
-	    getproperty.(sim_social_agents, :num_infected), 
-	    alpha = 0.3, label=nothing)
-end
-
-# ╔═╡ 6a3464d0-5ecc-11eb-2eed-6fa78e0af4e9
-md"""
-`num_infected` is slightly higher for agents with higher social score
-"""
-
-# ╔═╡ b5b4d834-0a41-11eb-1b18-1bd626d18934
-md"""
-👉 Run a simulation for 100 steps, and then apply a "lockdown" where every agent's social score gets multiplied by 0.25, and then run a second simulation which runs on that same population from there.  What do you notice?  How does changing this factor form 0.25 to other numbers affect things?
-"""
 
 # ╔═╡ a83c96e2-0a5a-11eb-0e58-15b5dda7d2d2
 let
@@ -997,43 +1075,40 @@ let
     end
 end
 
-# ╔═╡ 05fc5634-09a0-11eb-038e-53d63c3edaf2
-md"""
-## **Exercise 5:** (Optional) _Effect of distancing_
-
-We can use a variant of the above model to investigate the effect of the
-mis-named "social distancing"  
-(we want people to be *socially* close, but *physically* distant).
-
-In this variant, we separate out the two effects "infection" and
-"movement": an infected agent chooses a
-neighbouring site, and if it finds a susceptible there then it infects it
-with probability $p_I$. For simplicity we can ignore recovery.
-
-Separately, an agent chooses a neighbouring site to move to,
-and moves there with probability $p_M$ if the site is vacant. (Otherwise it
-stays where it is.)
-
-When $p_M = 0$, the agents cannot move, and hence are
-completely quarantined in their original locations.
-
-👉 How does the disease spread in this case?
-
-"""
-
-# ╔═╡ 24c2fb0c-0a42-11eb-1a1a-f1246f3420ff
-mutable struct SocialDistancingAgent <: AbstractAgent 
-	position::Coordinate
-	status::InfectionStatus
-end
-
 # ╔═╡ c7649966-0a41-11eb-3a3a-57363cea7b06
 md"""
 👉 Run the dynamics repeatedly, and plot the sites which become infected.
 """
 
 # ╔═╡ 2635b574-0a42-11eb-1daa-971b2596ce44
-
+let
+	L = 20
+	ρ = 0.2
+	N = floor(ρ * L^2)
+	
+	x = initialize_social_distancing(N, L)
+	inff = SocialDistancingInfection(0.5, 0.2, 0.001)
+	T_max = 3000
+	
+	init_plot = visualize(x, L)
+	S_counts = []
+	I_counts = []
+	
+	for _ in 1:T_max
+		sweep!(x, L, inff)
+		S_count = sum(is_susceptible.(x))
+		I_count = sum(is_infected.(x))
+		push!(S_counts, S_count)
+		push!(I_counts, I_count)
+	end
+	finish_plot = visualize(x, L)
+	time_series = plot(xlim=(1, T_max), ylim=(0, N))
+	plot!(time_series, 1:T_max, S_counts, color=color(S), lable="S")
+	plot!(time_series, 1:T_max, I_counts, color=color(I), lable="I")
+	
+	l = @layout [a b; c]
+	plot(init_plot, finish_plot, time_series, layout=l)
+end
 
 # ╔═╡ c77b085e-0a41-11eb-2fcb-534238cd3c49
 md"""
@@ -1371,6 +1446,8 @@ bigbreak
 # ╠═a83c96e2-0a5a-11eb-0e58-15b5dda7d2d2
 # ╟─05fc5634-09a0-11eb-038e-53d63c3edaf2
 # ╠═24c2fb0c-0a42-11eb-1a1a-f1246f3420ff
+# ╠═eb837850-5f7b-11eb-169f-99bf7bcbbfe3
+# ╠═81e174d0-5f79-11eb-3274-b7659aaecee8
 # ╟─c7649966-0a41-11eb-3a3a-57363cea7b06
 # ╠═2635b574-0a42-11eb-1daa-971b2596ce44
 # ╟─c77b085e-0a41-11eb-2fcb-534238cd3c49
