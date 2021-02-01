@@ -228,15 +228,25 @@ md"""
 👉 Write a function `euler_integrate` that takes takes a known function ``f'``, the initial value ``f(a)`` and a range `T` with `a == first(T)` and `h == step(T)`. It applies the function `euler_integrate_step` repeatedly, once per entry in `T`, to produce the sequence of values ``f(a+h)``, ``f(a+2h)``, etc.
 """
 
-# ╔═╡ fff7754c-12c4-11eb-2521-052af1946b66
+# ╔═╡ dae0b230-6442-11eb-34bf-fb7b9ff053c1
 function euler_integrate(fprime::Function, fa::Number, 
+		T::AbstractRange)
+	h = step(T)
+	ret = accumulate(T[1:end-1], init = fa) do x, t
+		euler_integrate_step(fprime, x, t, h)
+	end
+	pushfirst!(ret, fa)
+	return ret
+end
+
+# ╔═╡ fff7754c-12c4-11eb-2521-052af1946b66
+function euler_integrate_old(fprime::Function, fa::Number, 
 		T::AbstractRange)
 	
 	a0 = T[1]
 	h = step(T)
 	ret = [float(fa)]
 	for t in T[2:end]
-		# ret[i] = euler_integrate_step(fprime, ret[i-1], T[i-1], h)
 		append!(ret, euler_integrate_step(fprime, last(ret), a0, h))
 		a0 = t
 	end
@@ -255,7 +265,7 @@ euler_test = let
 	fprime(x) = 3x^2
 	T = 0 : 0.1 : 10
 	
-	euler_integrate(fprime, 0, T)
+	euler_integrate_old(fprime, 0, T)
 end
 
 # ╔═╡ ab72fdbe-10be-11eb-3b33-eb4ab41730d6
@@ -329,10 +339,10 @@ function euler_SIR(β, γ, sir_0::Vector, T::AbstractRange)
 	h = step(T)
 	
 	num_steps = length(T)
-	ret = [sir_0]
-	for _ in 2:num_steps
-		push!(ret, euler_SIR_step(β, γ, last(ret), h))
+	ret = accumulate(2:num_steps, init = sir_0) do x, _
+		euler_SIR_step(β, γ, x, h)
 	end
+	pushfirst!(ret, sir_0)
 	return ret
 end
 
@@ -548,7 +558,6 @@ begin
 			pos_change = sqrt((next_x - x)^2 + (next_y - y)^2)
 			x, y = next_x, next_y
 			i += 1
-			# print([i, pos_change])
 		end
 		return x, y
 	end
@@ -831,9 +840,6 @@ function loss_sir(β, γ)
 	return loss
 end
 
-# ╔═╡ ee20199a-12d4-11eb-1c2c-3f571bbb232e
-loss_sir(guess_β, guess_γ)
-
 # ╔═╡ 38b09bd8-12d5-11eb-2f7b-579e9db3973d
 md"""
 👉 Use this loss function to find the optimal parameters ``\beta`` and ``\gamma``.
@@ -846,6 +852,9 @@ found_β, found_γ = let
 	gradient_descent_2d(loss_sir, β0, γ0,
 		η = 1e-5, max_steps=10_000, min_change=1E-20)
 end
+
+# ╔═╡ ee20199a-12d4-11eb-1c2c-3f571bbb232e
+[loss_sir(guess_β, guess_γ), loss_sir(found_β, found_γ)]
 
 # ╔═╡ b94b7610-106d-11eb-2852-25337ce6ec3a
 if student.name == "Jazzy Doe" || student.kerberos_id == "jazz"
@@ -1196,7 +1205,7 @@ let
 	a = 1
 	h = .3
 	history = euler_integrate(wavy_deriv, wavy(a + h), 
-		range(a; step=h, length=N_euler) .+ h)
+		range(a; step=h, length=N_euler) )
 	
 	slope = wavy_deriv(a_euler)
 	
@@ -1336,6 +1345,7 @@ end
 # ╠═fa320028-12c4-11eb-0156-773e2aba8e58
 # ╟─3df7d63a-12c4-11eb-11ca-0b8db4bd9121
 # ╟─2335cae6-112f-11eb-3c2c-254e82014567
+# ╠═dae0b230-6442-11eb-34bf-fb7b9ff053c1
 # ╠═fff7754c-12c4-11eb-2521-052af1946b66
 # ╟─4d0efa66-12c6-11eb-2027-53d34c68d5b0
 # ╠═b74d94b8-10bf-11eb-38c1-9f39dfcb1096
