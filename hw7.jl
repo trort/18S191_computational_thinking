@@ -391,8 +391,8 @@ md"""
 
 # ╔═╡ 79532662-1c7e-11eb-2edf-57e7cfbc1eda
 begin
-	@assert reflect([-3, 1], [0, 1]) == [-3, -1]
-	@assert reflect([-3, 1], [1, 0]) == [3, 1]
+	@assert reflect([-3, 1], [0, -1]) == [-3, -1]
+	@assert reflect([-3, 1], [-1, 0]) == [3, 1]
 end
 
 # ╔═╡ b6614d80-194b-11eb-1edb-dba3c29672f8
@@ -810,7 +810,7 @@ function interact(photon::Photon, hit::Intersection{Sphere})
 	hit_normal = sphere_normal_at(hit.point, hit.object)
 	old_ior, new_ior = 1.0, hit.object.ior
 	# if photon.ior != 1.0
-	if (photon.l) ⋅ (hit.point - hit.object.center) > 0
+	if (photon.l) ⋅ (hit_normal) > 0
 		old_ior, new_ior = new_ior, old_ior
 	end
 	refracted_normal = refract(photon.l, hit_normal, old_ior, new_ior)
