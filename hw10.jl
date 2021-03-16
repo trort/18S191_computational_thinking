@@ -940,10 +940,10 @@ We can now simulate our radiation ocean model, reusing much of the code from our
 radiation_sim = let
 	grid = Grid(10, 6.e6)
 	# you can specify non-default parameters like so:
-	params = RadiationOceanModelParameters(S_mean=2000, A=210, κ=2e4,
+	params = RadiationOceanModelParameters(S_mean=1380, A=210, κ=2e4,
 		#ΔT = 10, 
 		#α0=0.0, 
-		αi = 0.75,
+		#αi = 0.75,
 	)
 	# params = RadiationOceanModelParameters()
 	
@@ -1045,9 +1045,34 @@ In this final exercise, we will generate a visualization to help us understand t
 """
 
 # ╔═╡ 0d197fe0-2e6d-11eb-2346-2daf4e80a9a7
-function eq_T(S, T_init_value)
-	
-	return missing
+begin
+	function eq_T(S, T_init_value)
+		grid = Grid(10, 6.e6)
+		# you can specify non-default parameters like so:
+		params = RadiationOceanModelParameters(S_mean=S)
+
+		u, v = DoubleGyre(grid)
+
+		T_init = constantT(grid; value=T_init_value)
+
+		model = RadiationOceanModel(grid, params, u, v)
+		Δt = 400*60*60
+
+		sim = ClimateModelSimulation(model, T_init, Δt)
+
+		last_T = missing
+		current_T = T_init
+		while ismissing(last_T) || sum(abs.(current_T .- last_T)) > 1
+			last_T = copy(current_T)
+			timestep!(sim)
+			current_T = sim.T
+		end
+		return mean(current_T)
+	end
+
+	function eq_T((S, T_init_value)::Tuple{Any, Any})
+		eq_T(S, T_init_value)
+	end
 end
 
 # ╔═╡ f70f52f0-2e9a-11eb-1bab-13c3b7ad3ca4
@@ -1056,7 +1081,7 @@ md"""
 """
 
 # ╔═╡ 59ecd040-2e9c-11eb-05e3-0bc96e9cddec
-
+eq_T.([1380], [-50, 50, 55])
 
 # ╔═╡ 2495e330-2c0a-11eb-3a10-530f8b87a4eb
 md"""
@@ -1072,13 +1097,27 @@ md"""
 
 # ╔═╡ 59da0470-2b8f-11eb-098c-993effcedecf
 # you can change me!
-bifurcation_ST = [(S,T) for S in [1000, 1380, 2000] for T in [-50, 0, 50]]
+begin
+	S_samples = 1000:100:2000
+	T_samples = -50:10:50
+	bifurcation_ST = [(S,T) for S in S_samples for T in T_samples]
+end
 
-# ╔═╡ 9eacf3d0-2e9d-11eb-3c19-1dcfadccf18d
+# ╔═╡ a8367170-8545-11eb-2922-675a500d809c
+bifurcation_eq_T = ThreadsX.map(bifurcation_ST) do ST
+	eq_T(ST)
+end
 
-
-# ╔═╡ 9e653c70-2e9d-11eb-0af5-25dc140d5824
-
+# ╔═╡ 0cb3edb2-8548-11eb-20e8-bf2553a5e0f5
+let
+	p = heatmap(
+		S_samples,
+		T_samples,
+		reshape(bifurcation_eq_T, (length(T_samples), length(S_samples))),
+		color=:bluesreds,
+	)
+	plot!(p, xlabel = "S_mean", ylabel = "T_init")
+end
 
 # ╔═╡ 92ae22de-2d88-11eb-1d03-2977c539ba23
 md"""
@@ -1326,7 +1365,7 @@ todo(text) = HTML("""<div
 # ╟─6dbc3d34-2a89-11eb-2c80-75459a8e237a
 # ╟─c20b0e00-2a8a-11eb-045d-9db88411746f
 # ╟─933d42fa-2a67-11eb-07de-61cab7567d7d
-# ╟─c9ea0f72-2a67-11eb-20ba-376ca9c8014f
+# ╠═c9ea0f72-2a67-11eb-20ba-376ca9c8014f
 # ╟─3b24e1b0-2b46-11eb-383b-c57cbf3e68f1
 # ╟─c0298712-2a88-11eb-09af-bf2c39167aa6
 # ╟─e2e4cfac-2a63-11eb-1b7f-9d8d5d304b43
@@ -1342,7 +1381,7 @@ todo(text) = HTML("""<div
 # ╟─3dffa000-2db7-11eb-263b-57fa833d5785
 # ╠═b952d290-2db7-11eb-3fa9-2bc8d77b9fd6
 # ╟─88c56350-2c08-11eb-14e9-77e71d749e6d
-# ╟─014495d6-2cda-11eb-05d7-91e5a467647e
+# ╠═014495d6-2cda-11eb-05d7-91e5a467647e
 # ╟─d6a56496-2cda-11eb-3d54-d7141a49a446
 # ╠═126bffce-2d0b-11eb-2bfd-bb5d1ad1169b
 # ╟─171c6880-2d0b-11eb-0180-454f2876cf51
@@ -1389,8 +1428,8 @@ todo(text) = HTML("""<div
 # ╠═068795ee-2b4c-11eb-3e58-353eb8978c1c
 # ╟─ad95c4e0-2b4a-11eb-3584-dda89970ffdf
 # ╠═b059c6e0-2b4a-11eb-216a-39bb43c7b423
-# ╟─5fd346d0-2b4d-11eb-066b-9ba9c9d97613
-# ╟─6568b850-2b4d-11eb-02e9-696654ac2d37
+# ╠═5fd346d0-2b4d-11eb-066b-9ba9c9d97613
+# ╠═6568b850-2b4d-11eb-02e9-696654ac2d37
 # ╟─6fc5b760-2e97-11eb-1d7f-0d666b0a41d5
 # ╟─5a755e00-2e98-11eb-0f83-997a60409484
 # ╠═5294aad0-2d15-11eb-091d-59d7517c4dc2
@@ -1409,8 +1448,8 @@ todo(text) = HTML("""<div
 # ╟─590c50c0-2e9b-11eb-2bb2-cf35f65a447e
 # ╟─2495e330-2c0a-11eb-3a10-530f8b87a4eb
 # ╠═59da0470-2b8f-11eb-098c-993effcedecf
-# ╠═9eacf3d0-2e9d-11eb-3c19-1dcfadccf18d
-# ╠═9e653c70-2e9d-11eb-0af5-25dc140d5824
+# ╠═a8367170-8545-11eb-2922-675a500d809c
+# ╠═0cb3edb2-8548-11eb-20e8-bf2553a5e0f5
 # ╟─92ae22de-2d88-11eb-1d03-2977c539ba23
 # ╠═547d92d0-2d88-11eb-18b5-0fc468ae0026
 # ╠═60bbba90-2d88-11eb-1616-87d6e15c0795
